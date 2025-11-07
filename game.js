@@ -1,134 +1,214 @@
-// VK PLAY CAMERA FIX
+// VK PLAY CAMERA FIX - УЛУЧШЕННАЯ ВЕРСИЯ
 function setupVKPlayCamera() {
     return new Promise((resolve, reject) => {
-        // Показываем пользователю инструкцию
-        const cameraMessage = document.createElement('div');
-        cameraMessage.id = 'camera-message';
-        cameraMessage.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0,0,0,0.9);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            z-index: 10000;
-            text-align: center;
-            max-width: 400px;
-        `;
-        
-        cameraMessage.innerHTML = `
-            <h2>🎮 Доступ к камере</h2>
-            <p>Для игры требуется доступ к веб-камере.</p>
-            <p>VK Play блокирует камеру в iframe.</p>
-            <p><strong>Решение:</strong></p>
-            <button id="open-external" style="
-                background: #0077ff;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 5px;
-                margin: 10px;
-                cursor: pointer;
-            ">Открыть в браузере</button>
-            <button id="try-anyway" style="
-                background: #ff4444;
-                color: white;
-                border: none;
-                padding: 10px 20px;
-                border-radius: 5px;
-                margin: 10px;
-                cursor: pointer;
-            ">Попробовать в VK Play</button>
-        `;
-        
-        document.body.appendChild(cameraMessage);
-        
-        // Кнопка "Открыть в браузере"
-        document.getElementById('open-external').addEventListener('click', function() {
-            window.open('https://ilua2003.github.io/fruit-ninja/', '_blank');
-            cameraMessage.remove();
-        });
-        
-        // Кнопка "Попробовать в VK Play" 
-        document.getElementById('try-anyway').addEventListener('click', function() {
-            cameraMessage.remove();
-            setupCameraWithFallback().then(resolve).catch(reject);
+        // Сначала проверяем, возможно ли вообще получить камеру
+        checkCameraPermissions().then(hasPermission => {
+            if (hasPermission) {
+                // Если есть разрешение, пробуем использовать камеру
+                setupCameraWithFallback().then(resolve).catch(reject);
+            } else {
+                // Если нет разрешения, сразу показываем альтернативу
+                showCameraInstructions();
+                reject(new Error('Camera permission denied'));
+            }
         });
     });
 }
 
-// Альтернативная настройка камеры с обработкой ошибок
-async function setupCameraWithFallback() {
+// Проверка разрешений камеры
+async function checkCameraPermissions() {
     try {
-        // Пытаемся получить доступ к камере
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                width: { ideal: 640 },
-                height: { ideal: 360 },
-                frameRate: { ideal: 30 }
-            } 
-        });
-        
-        videoElement.srcObject = stream;
-        
-        // Ждем пока видео готово
-        return new Promise((resolve) => {
-            videoElement.onloadedmetadata = () => {
-                resolve(stream);
-            };
-        });
-        
+        // Проверяем текущие разрешения
+        const permissions = await navigator.permissions.query({ name: 'camera' });
+        return permissions.state === 'granted';
     } catch (error) {
-        console.log('Camera access denied:', error);
-        
-        // Показываем сообщение об ошибке
-        showCameraError();
-        throw error;
+        // Если API permissions не поддерживается, пробуем получить камеру
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream.getTracks().forEach(track => track.stop());
+            return true;
+        } catch (e) {
+            return false;
+        }
     }
 }
 
-// Сообщение об ошибке камеры
-function showCameraError() {
-    const errorDiv = document.createElement('div');
-    errorDiv.style.cssText = `
+// Показываем инструкцию по камере
+function showCameraInstructions() {
+    // Скрываем стандартный экран загрузки
+    loadingScreen.style.display = 'none';
+    
+    // Создаем красивый экран инструкций
+    const instructionScreen = document.createElement('div');
+    instructionScreen.id = 'instruction-screen';
+    instructionScreen.style.cssText = `
         position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #ff4444;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
-        padding: 15px;
-        border-radius: 5px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
         z-index: 10000;
         text-align: center;
-    `;
-    errorDiv.innerHTML = `
-        <strong>⚠️ Камера недоступна</strong><br>
-        Откройте игру в отдельном окне браузера
+        padding: 20px;
+        font-family: Arial, sans-serif;
     `;
     
-    document.body.appendChild(errorDiv);
+    instructionScreen.innerHTML = `
+        <div style="background: rgba(255,255,255,0.1); padding: 30px; border-radius: 15px; backdrop-filter: blur(10px); max-width: 500px;">
+            <h1 style="font-size: 2.5em; margin-bottom: 10px;">🎮 Fruit Ninja</h1>
+            <h2 style="font-size: 1.5em; margin-bottom: 20px;">Управление жестами</h2>
+            
+            <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px; margin: 15px 0;">
+                <p style="font-size: 1.1em; margin-bottom: 15px;">
+                    <strong>⚠️ Внимание!</strong><br>
+                    VK Play блокирует доступ к камере для игр
+                </p>
+            </div>
+            
+            <div style="margin: 20px 0;">
+                <h3 style="margin-bottom: 15px;">🎯 Как играть:</h3>
+                <p><strong>Вариант 1 (рекомендуется):</strong></p>
+                <button id="open-browser" style="
+                    background: #4CAF50;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 25px;
+                    margin: 10px;
+                    cursor: pointer;
+                    font-size: 1.1em;
+                    width: 100%;
+                ">
+                    🚀 Открыть в браузере (работает камера)
+                </button>
+                
+                <p style="margin-top: 20px;"><strong>Вариант 2 (в VK Play):</strong></p>
+                <button id="play-mouse" style="
+                    background: #2196F3;
+                    color: white;
+                    border: none;
+                    padding: 12px 24px;
+                    border-radius: 25px;
+                    margin: 10px;
+                    cursor: pointer;
+                    font-size: 1.1em;
+                    width: 100%;
+                ">
+                    🖱️ Играть с управлением мышью
+                </button>
+            </div>
+            
+            <div style="margin-top: 20px; font-size: 0.9em; opacity: 0.8;">
+                <p>Для полного опыта с отслеживанием рук используйте браузерную версию</p>
+            </div>
+        </div>
+    `;
     
-    // Автоматически скрыть через 5 секунд
-    setTimeout(() => {
-        errorDiv.remove();
-    }, 5000);
+    document.body.appendChild(instructionScreen);
+    
+    // Обработчики кнопок
+    document.getElementById('open-browser').addEventListener('click', function() {
+        window.open('https://ilua2003.github.io/fruit-ninja/', '_blank');
+    });
+    
+    document.getElementById('play-mouse').addEventListener('click', function() {
+        instructionScreen.remove();
+        startScreen.style.display = 'flex'; // Показываем стандартный экран старта
+        setupMouseControls(); // Включаем управление мышью
+    });
 }
 
-// Обновленная функция инициализации
-async function init() {
-    // Сначала пытаемся настроить камеру
-    try {
-        await setupVKPlayCamera();
-        await setupCameraWithFallback();
-    } catch (error) {
-        // Если камера недоступна, показываем альтернативное управление
-        showAlternativeControls();
-    }
+// Настройка управления мышью
+function setupMouseControls() {
+    console.log('Mouse controls activated for VK Play');
     
-    // Продолжаем остальную инициализацию
+    // Добавляем обработчики мыши
+    gameCanvas.addEventListener('mousemove', handleMouseMove);
+    gameCanvas.addEventListener('mousedown', handleMouseDown);
+    gameCanvas.addEventListener('mouseup', handleMouseUp);
+    gameCanvas.style.cursor = 'crosshair';
+    
+    // Имитируем данные руки для игры
+    gameState.fingerTip = { x: 0.5, y: 0.5, z: 0 };
+    gameState.prevFingerTip = { x: 0.5, y: 0.5, z: 0 };
+    gameState.handLandmarks = [{x: 0.5, y: 0.5, z: 0}]; // Фиктивные данные
+    
+    // Показываем подсказку об управлении
+    showMouseHint();
+}
+
+function showMouseHint() {
+    const hint = document.createElement('div');
+    hint.style.cssText = `
+        position: fixed;
+        bottom: 10px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 20px;
+        z-index: 9999;
+        font-size: 0.9em;
+    `;
+    hint.textContent = 'Управление: двигайте мышью для разрезания фруктов';
+    document.body.appendChild(hint);
+    
+    setTimeout(() => hint.remove(), 5000);
+}
+
+// Обработчики мыши
+let isMouseDown = false;
+
+function handleMouseMove(event) {
+    const rect = gameCanvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+    
+    gameState.prevFingerTip = { ...gameState.fingerTip };
+    gameState.fingerTip = { x, y, z: 0 };
+    
+    // Создаем след только при зажатой кнопке мыши
+    if (isMouseDown && gameState.isGameActive) {
+        createBladeTrail(
+            x * window.innerWidth * 0.5,
+            y * window.innerHeight,
+            gameState.prevFingerTip.x * window.innerWidth * 0.5,
+            gameState.prevFingerTip.y * window.innerHeight
+        );
+    }
+}
+
+function handleMouseDown(event) {
+    isMouseDown = true;
+    
+    // Создаем начальный след
+    const rect = gameCanvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+    
+    gameState.fingerTip = { x, y, z: 0 };
+    createBladeTrail(
+        x * window.innerWidth * 0.5,
+        y * window.innerHeight,
+        x * window.innerWidth * 0.5,
+        y * window.innerHeight
+    );
+}
+
+function handleMouseUp() {
+    isMouseDown = false;
+}
+
+// ОБНОВЛЕННАЯ ФУНКЦИЯ INIT
+async function init() {
+    // Сначала настраиваем базовые элементы
     startButton.addEventListener('click', startGame);
     restartButton.addEventListener('click', startGame);
     window.addEventListener('resize', onWindowResize);
@@ -143,69 +223,18 @@ async function init() {
         gameState.mobileSpawnRange = 11;
     }
     
-    // Настраиваем отслеживание рук (если камера доступна)
-    if (videoElement.srcObject) {
+    // Пытаемся настроить камеру
+    try {
+        await setupVKPlayCamera();
+        // Если камера доступна, настраиваем отслеживание рук
         await setupHandTracking();
+        loadingScreen.style.display = 'none';
+        startScreen.style.display = 'flex';
+    } catch (error) {
+        // Если камера недоступна, показываем инструкции
+        console.log('Camera not available, showing instructions');
+        // Функция showCameraInstructions уже покажет альтернативы
     }
-    
-    loadingScreen.style.display = 'none';
-}
-
-// Альтернативное управление для случаев когда камера недоступна
-function showAlternativeControls() {
-    const altControls = document.createElement('div');
-    altControls.id = 'alt-controls';
-    altControls.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0,0,0,0.8);
-        color: white;
-        padding: 10px;
-        border-radius: 5px;
-        z-index: 9999;
-        text-align: center;
-    `;
-    altControls.innerHTML = `
-        <p>Используйте мышь для управления (камера недоступна)</p>
-    `;
-    
-    document.body.appendChild(altControls);
-    
-    // Добавляем обработчик мыши как альтернативу
-    gameCanvas.addEventListener('mousemove', handleMouseMove);
-    gameCanvas.addEventListener('click', handleMouseClick);
-}
-
-// Обработчики мыши для альтернативного управления
-function handleMouseMove(event) {
-    if (!gameState.isGameActive) return;
-    
-    const rect = gameCanvas.getBoundingClientRect();
-    const x = (event.clientX - rect.left) / rect.width;
-    const y = (event.clientY - rect.top) / rect.height;
-    
-    // Имитируем движение руки
-    gameState.fingerTip = { x, y, z: 0 };
-    createBladeTrail(
-        x * window.innerWidth * 0.5,
-        y * window.innerHeight,
-        x * window.innerWidth * 0.5,
-        y * window.innerHeight
-    );
-}
-
-function handleMouseClick(event) {
-    if (!gameState.isGameActive) return;
-    
-    // Имитируем быстрое движение для разрезания
-    const rect = gameCanvas.getBoundingClientRect();
-    const x = (event.clientX - rect.left) / rect.width;
-    const y = (event.clientY - rect.top) / rect.height;
-    
-    gameState.fingerTip = { x, y, z: 0 };
-    gameState.prevFingerTip = { x: x - 0.1, y: y - 0.1, z: 0 };
 }
 
 
