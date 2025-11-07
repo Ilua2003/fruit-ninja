@@ -1,3 +1,214 @@
+// VK PLAY CAMERA FIX
+function setupVKPlayCamera() {
+    return new Promise((resolve, reject) => {
+        // Показываем пользователю инструкцию
+        const cameraMessage = document.createElement('div');
+        cameraMessage.id = 'camera-message';
+        cameraMessage.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 10000;
+            text-align: center;
+            max-width: 400px;
+        `;
+        
+        cameraMessage.innerHTML = `
+            <h2>🎮 Доступ к камере</h2>
+            <p>Для игры требуется доступ к веб-камере.</p>
+            <p>VK Play блокирует камеру в iframe.</p>
+            <p><strong>Решение:</strong></p>
+            <button id="open-external" style="
+                background: #0077ff;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                margin: 10px;
+                cursor: pointer;
+            ">Открыть в браузере</button>
+            <button id="try-anyway" style="
+                background: #ff4444;
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 5px;
+                margin: 10px;
+                cursor: pointer;
+            ">Попробовать в VK Play</button>
+        `;
+        
+        document.body.appendChild(cameraMessage);
+        
+        // Кнопка "Открыть в браузере"
+        document.getElementById('open-external').addEventListener('click', function() {
+            window.open('https://ilua2003.github.io/fruit-ninja/', '_blank');
+            cameraMessage.remove();
+        });
+        
+        // Кнопка "Попробовать в VK Play" 
+        document.getElementById('try-anyway').addEventListener('click', function() {
+            cameraMessage.remove();
+            setupCameraWithFallback().then(resolve).catch(reject);
+        });
+    });
+}
+
+// Альтернативная настройка камеры с обработкой ошибок
+async function setupCameraWithFallback() {
+    try {
+        // Пытаемся получить доступ к камере
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+                width: { ideal: 640 },
+                height: { ideal: 360 },
+                frameRate: { ideal: 30 }
+            } 
+        });
+        
+        videoElement.srcObject = stream;
+        
+        // Ждем пока видео готово
+        return new Promise((resolve) => {
+            videoElement.onloadedmetadata = () => {
+                resolve(stream);
+            };
+        });
+        
+    } catch (error) {
+        console.log('Camera access denied:', error);
+        
+        // Показываем сообщение об ошибке
+        showCameraError();
+        throw error;
+    }
+}
+
+// Сообщение об ошибке камеры
+function showCameraError() {
+    const errorDiv = document.createElement('div');
+    errorDiv.style.cssText = `
+        position: fixed;
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #ff4444;
+        color: white;
+        padding: 15px;
+        border-radius: 5px;
+        z-index: 10000;
+        text-align: center;
+    `;
+    errorDiv.innerHTML = `
+        <strong>⚠️ Камера недоступна</strong><br>
+        Откройте игру в отдельном окне браузера
+    `;
+    
+    document.body.appendChild(errorDiv);
+    
+    // Автоматически скрыть через 5 секунд
+    setTimeout(() => {
+        errorDiv.remove();
+    }, 5000);
+}
+
+// Обновленная функция инициализации
+async function init() {
+    // Сначала пытаемся настроить камеру
+    try {
+        await setupVKPlayCamera();
+        await setupCameraWithFallback();
+    } catch (error) {
+        // Если камера недоступна, показываем альтернативное управление
+        showAlternativeControls();
+    }
+    
+    // Продолжаем остальную инициализацию
+    startButton.addEventListener('click', startGame);
+    restartButton.addEventListener('click', startGame);
+    window.addEventListener('resize', onWindowResize);
+    
+    handCanvas.width = window.innerWidth * 0.5;
+    handCanvas.height = window.innerHeight;
+    
+    gameState.defaultSpawnInterval = 1500;
+    gameState.defaultLives = 5;
+    
+    if (isMobileDevice() && window.innerWidth < 500) {
+        gameState.mobileSpawnRange = 11;
+    }
+    
+    // Настраиваем отслеживание рук (если камера доступна)
+    if (videoElement.srcObject) {
+        await setupHandTracking();
+    }
+    
+    loadingScreen.style.display = 'none';
+}
+
+// Альтернативное управление для случаев когда камера недоступна
+function showAlternativeControls() {
+    const altControls = document.createElement('div');
+    altControls.id = 'alt-controls';
+    altControls.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 10px;
+        border-radius: 5px;
+        z-index: 9999;
+        text-align: center;
+    `;
+    altControls.innerHTML = `
+        <p>Используйте мышь для управления (камера недоступна)</p>
+    `;
+    
+    document.body.appendChild(altControls);
+    
+    // Добавляем обработчик мыши как альтернативу
+    gameCanvas.addEventListener('mousemove', handleMouseMove);
+    gameCanvas.addEventListener('click', handleMouseClick);
+}
+
+// Обработчики мыши для альтернативного управления
+function handleMouseMove(event) {
+    if (!gameState.isGameActive) return;
+    
+    const rect = gameCanvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+    
+    // Имитируем движение руки
+    gameState.fingerTip = { x, y, z: 0 };
+    createBladeTrail(
+        x * window.innerWidth * 0.5,
+        y * window.innerHeight,
+        x * window.innerWidth * 0.5,
+        y * window.innerHeight
+    );
+}
+
+function handleMouseClick(event) {
+    if (!gameState.isGameActive) return;
+    
+    // Имитируем быстрое движение для разрезания
+    const rect = gameCanvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+    
+    gameState.fingerTip = { x, y, z: 0 };
+    gameState.prevFingerTip = { x: x - 0.1, y: y - 0.1, z: 0 };
+}
+
+
 // Game state
 const gameState = {
     score: 0,
