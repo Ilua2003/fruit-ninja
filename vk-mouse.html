@@ -139,6 +139,8 @@
         let fruits = [];
         let particles = [];
         let lastSpawn = 0;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
         
         // Элементы UI
         const scoreElement = document.getElementById('score');
@@ -164,8 +166,22 @@
             mouse.y = e.clientY;
             
             // Создаем эффект следа при движении
-            if (mouse.down && gameActive) {
-                createParticle(mouse.x, mouse.y, '#00ffff');
+            if (gameActive) {
+                // Создаем частицы только если мышь двигается достаточно быстро
+                const dx = mouse.x - lastMouseX;
+                const dy = mouse.y - lastMouseY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance > 5) {
+                    createTrailParticles(mouse.x, mouse.y);
+                    lastMouseX = mouse.x;
+                    lastMouseY = mouse.y;
+                }
+                
+                // Проверяем разрезание при движении с зажатой кнопкой
+                if (mouse.down) {
+                    checkFruitCut(mouse.x, mouse.y);
+                }
             }
         });
         
@@ -177,7 +193,7 @@
             // Сразу проверяем клик по фрукту
             if (gameActive) {
                 checkFruitClick(mouse.x, mouse.y);
-                createParticle(mouse.x, mouse.y, '#ffff00');
+                createParticle(mouse.x, mouse.y, '#ffff00', 12);
             }
         });
         
@@ -192,14 +208,28 @@
         });
         
         // Создание частиц для эффектов
-        function createParticle(x, y, color) {
+        function createParticle(x, y, color, radius = 8) {
             particles.push({
                 x: x,
                 y: y,
                 color: color,
-                radius: 8,
+                radius: radius,
                 life: 1.0
             });
+        }
+        
+        // Создание частиц следа
+        function createTrailParticles(x, y) {
+            // Создаем несколько частиц для более плотного следа
+            for (let i = 0; i < 3; i++) {
+                particles.push({
+                    x: x + (Math.random() - 0.5) * 10,
+                    y: y + (Math.random() - 0.5) * 10,
+                    color: '#00ffff',
+                    radius: 3 + Math.random() * 4,
+                    life: 0.5 + Math.random() * 0.3
+                });
+            }
         }
         
         // Создание фрукта
@@ -226,21 +256,47 @@
                 const distance = Math.sqrt(dx * dx + dy * dy);
                 
                 if (distance < fruit.radius && !fruit.sliced) {
-                    // Фрукт разрезан!
-                    fruit.sliced = true;
-                    score += 10;
-                    scoreElement.textContent = score;
-                    
-                    // Эффект взрыва
-                    for (let j = 0; j < 8; j++) {
-                        createParticle(fruit.x, fruit.y, fruit.color);
-                    }
-                    
-                    // Удаляем фрукт
-                    fruits.splice(i, 1);
+                    sliceFruit(i);
                     break;
                 }
             }
+        }
+        
+        // Проверка разрезания при движении мыши
+        function checkFruitCut(x, y) {
+            for (let i = fruits.length - 1; i >= 0; i--) {
+                const fruit = fruits[i];
+                const dx = fruit.x - x;
+                const dy = fruit.y - y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < fruit.radius && !fruit.sliced) {
+                    sliceFruit(i);
+                }
+            }
+        }
+        
+        // Разрезание фрукта
+        function sliceFruit(index) {
+            const fruit = fruits[index];
+            
+            // Фрукт разрезан!
+            fruit.sliced = true;
+            score += 10;
+            scoreElement.textContent = score;
+            
+            // Эффект взрыва
+            for (let j = 0; j < 12; j++) {
+                createParticle(
+                    fruit.x + (Math.random() - 0.5) * fruit.radius,
+                    fruit.y + (Math.random() - 0.5) * fruit.radius,
+                    fruit.color,
+                    4 + Math.random() * 6
+                );
+            }
+            
+            // Удаляем фрукт
+            fruits.splice(index, 1);
         }
         
         // Обновление игры
@@ -249,7 +305,7 @@
             
             if (gameActive) {
                 // Спавн новых фруктов
-                if (now - lastSpawn > 1500) {
+                if (now - lastSpawn > 1000) {
                     createFruit();
                     lastSpawn = now;
                 }
@@ -268,6 +324,7 @@
                     // Отскок от стен
                     if (fruit.x < fruit.radius || fruit.x > canvas.width - fruit.radius) {
                         fruit.vx *= -0.8;
+                        fruit.x = Math.max(fruit.radius, Math.min(canvas.width - fruit.radius, fruit.x));
                     }
                     
                     // Проверка выхода за экран
