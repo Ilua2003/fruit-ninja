@@ -1,42 +1,42 @@
 # ✋ Fruit Ninja 🥷
 
-A browser-based Fruit Ninja game using hand-tracking. No additional hardware required - just a webcam.
+Браузерная игра Fruit Ninja с отслеживанием рук. Не требует дополнительного оборудования - только веб-камеру.
 
-Play here 🎮: [https://collidingscopes.github.io/fruit-ninja/](https://collidingscopes.github.io/fruit-ninja/)
+Играть здесь 🎮: [https://ilua2003.github.io/fruit-ninja/](https://ilua2003.github.io/fruit-ninja/)
 
-## Features
+## Особенности
 
-- **Hand tracking**: Uses MediaPipe for real-time hand detection
-- **3D fruits**: Built with Three.js for smooth 3D animations
-- **Gesture-based controls**: Slice fruits by moving your hand quickly
-- **Visual feedback**: Colorful blade trails and explosion particles
-- **Scoring system**: Keep track of your high score
-- **Lives system**: Miss a fruit and lose a life (5 lives to start)
-- **Progressive difficulty**: Game gets harder as you progress
+- **Отслеживание рук**: Использует MediaPipe для обнаружения рук в реальном времени
+- **3D фрукты**: Создано с Three.js для плавной 3D анимации
+- **Управление жестами**: Разрубайте фрукты, быстро двигая рукой
+- **Визуальная обратная связь**: Красочные следы от лезвия и частицы взрывов
+- **Система очков**: Отслеживайте ваш рекорд
+- **Система жизней**: Пропустите фрукт и потеряйте жизнь (5 жизней в начале)
+- **Прогрессивная сложность**: Игра становится сложнее по мере прогресса
 
-## How to Play
+## Как играть
 
-1. Allow camera access when prompted
-2. Position yourself so your hand is visible in the webcam feed (left side of screen)
-3. Click "Start" to begin
-4. Move your hand quickly to slice fruits that appear on the right side
-5. Avoid missing fruits to maintain your lives
-6. Try to achieve the highest score!
+1. Разрешите доступ к камере при запросе
+2. Расположитесь так, чтобы ваша рука была видна в веб-камере (левая часть экрана)
+3. Нажмите "Start" чтобы начать
+4. Быстро двигайте рукой чтобы разрубать фрукты, появляющиеся справа
+5. Избегайте пропусков фруктов чтобы сохранить жизни
+6. Попытайтесь достичь наивысшего счета!
 
-## Technical Details
+## Технические детали
 
-- Uses MediaPipe Hands for hand tracking
-- Three.js for 3D rendering
-- Vanilla JavaScript with no framework dependencies
-- Optimized for both desktop and mobile devices
-- Cross-platform compatibility with modern browsers
+- Использует MediaPipe Hands для отслеживания рук
+- Three.js для 3D рендеринга
+- Vanilla JavaScript без зависимостей от фреймворков
+- Оптимизировано для десктопных и мобильных устройств
+- Кросс-платформенная совместимость с современными браузерами
 
-## Feedback
+## Обратная связь
 
-Send feedback via:
-- Twitter: [@measure_plan](https://x.com/measure_plan)
-- Instagram: [@stereo.drift](https://instagram.com/stereo.drift)
+Свяжитесь со мной через:
+- VK: [Ha1rex](https://vk.com/ha1rex)
+- Telegram: [Crashbush](http://t.me/crashbush)
 
-## License
+## Лицензия
 
-MIT License - Feel free to use and modify as you wish!
+MIT License - Свободно используйте и изменяйте как хотите!
