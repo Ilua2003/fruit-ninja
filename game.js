@@ -655,4 +655,276 @@ async function init() {
 }
 
 // Start initialization
+// MOUSE CONTROLS FOR VK PLAY
+function setupMouseControls() {
+    console.log('Setting up mouse controls for VK Play');
+    
+    // Добавляем состояние мыши в gameState
+    gameState.mousePosition = { x: 0, y: 0 };
+    gameState.isMouseDown = false;
+    gameState.mouseSpeed = 0;
+    gameState.lastMouseTime = Date.now();
+    
+    // Обработчики мыши
+    gameCanvas.addEventListener('mousemove', handleMouseMove);
+    gameCanvas.addEventListener('mousedown', handleMouseDown);
+    gameCanvas.addEventListener('mouseup', handleMouseUp);
+    gameCanvas.addEventListener('mouseleave', handleMouseLeave);
+    
+    // Курсор-перекрестие
+    gameCanvas.style.cursor = 'crosshair';
+    
+    // Создаем фиктивные данные руки для совместимости
+    if (!gameState.handLandmarks) {
+        gameState.handLandmarks = [{x: 0.5, y: 0.5, z: 0}];
+    }
+}
+
+function handleMouseMove(event) {
+    const rect = gameCanvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+    
+    const now = Date.now();
+    const deltaTime = (now - gameState.lastMouseTime) / 1000;
+    gameState.lastMouseTime = now;
+    
+    // Рассчитываем скорость мыши
+    const deltaX = x - gameState.mousePosition.x;
+    const deltaY = y - gameState.mousePosition.y;
+    gameState.mouseSpeed = Math.sqrt(deltaX * deltaX + deltaY * deltaY) / (deltaTime || 0.016);
+    
+    // Сохраняем предыдущую позицию для создания следа
+    gameState.prevFingerTip = { ...gameState.fingerTip };
+    
+    // Обновляем текущую позицию (совместимость с камерным кодом)
+    gameState.fingerTip = { x, y, z: 0 };
+    gameState.mousePosition = { x, y };
+    
+    // Создаем след лезвия при движении с зажатой кнопкой
+    if (gameState.isMouseDown && gameState.isGameActive && gameState.mouseSpeed > 50) {
+        createBladeTrail(
+            x * window.innerWidth * 0.5,
+            y * window.innerHeight,
+            gameState.prevFingerTip.x * window.innerWidth * 0.5,
+            gameState.prevFingerTip.y * window.innerHeight
+        );
+        
+        // Проверяем коллизии в реальном времени
+        checkMouseCollisions();
+    }
+}
+
+function handleMouseDown(event) {
+    gameState.isMouseDown = true;
+    
+    const rect = gameCanvas.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+    
+    // Устанавливаем начальную позицию
+    gameState.fingerTip = { x, y, z: 0 };
+    gameState.mousePosition = { x, y };
+    gameState.mouseSpeed = 100; // Начальная скорость
+    
+    // Создаем начальный след
+    createBladeTrail(
+        x * window.innerWidth * 0.5,
+        y * window.innerHeight,
+        x * window.innerWidth * 0.5,
+        y * window.innerHeight
+    );
+}
+
+function handleMouseUp() {
+    gameState.isMouseDown = false;
+}
+
+function handleMouseLeave() {
+    gameState.isMouseDown = false;
+}
+
+// Проверка коллизий для мыши
+function checkMouseCollisions() {
+    if (!gameState.isMouseDown) return;
+    
+    // Используем текущую позицию мыши (масштабируем как для камеры)
+    const mouseX = (gameState.fingerTip.x * 40) - 20;
+    const mouseY = (0.5 - gameState.fingerTip.y) * 15;
+    
+    // Проверяем коллизии с фруктами
+    gameState.fruits.forEach(fruit => {
+        if (!fruit.sliced) {
+            const dx = fruit.mesh.position.x - mouseX;
+            const dy = fruit.mesh.position.y - mouseY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Для мыши используем меньшую дистанцию и учитываем скорость
+            const MOUSE_SLICE_DISTANCE = 3.0;
+            const MIN_MOUSE_SPEED = 50;
+            
+            if (distance < MOUSE_SLICE_DISTANCE && gameState.mouseSpeed > MIN_MOUSE_SPEED) {
+                sliceFruit(fruit);
+            }
+        }
+    });
+}
+
+// ОБНОВЛЕННАЯ функция проверки коллизий (работает и для камеры и для мыши)
+function checkCollisions() {
+    // Если есть данные с камеры - используем камеру
+    if (gameState.handLandmarks && gameState.handLandmarks.length > 0) {
+        const fingerX = (gameState.fingerTip.x * 40) - 20;
+        const fingerY = (0.5 - gameState.fingerTip.y) * 15;
+        
+        gameState.fruits.forEach(fruit => {
+            if (!fruit.sliced) {
+                const dx = fruit.mesh.position.x - fingerX;
+                const dy = fruit.mesh.position.y - fingerY;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                const moveSpeed = calculateHandSpeed();
+                const MIN_SLICE_SPEED = 0.04;
+                const SLICE_DISTANCE = 5;
+
+                if (distance < SLICE_DISTANCE && moveSpeed > MIN_SLICE_SPEED) {
+                    sliceFruit(fruit);
+                }
+            }
+        });
+    }
+    // Если нет камеры, но есть движение мышью - используем мышь
+    else if (gameState.isMouseDown && gameState.mouseSpeed > 50) {
+        checkMouseCollisions();
+    }
+}
+
+// ОБНОВЛЕННАЯ функция инициализации
+async function init() {
+    // Настраиваем базовые обработчики
+    startButton.addEventListener('click', startGame);
+    restartButton.addEventListener('click', startGame);
+    window.addEventListener('resize', onWindowResize);
+    
+    // Устанавливаем размеры canvas
+    handCanvas.width = window.innerWidth * 0.5;
+    handCanvas.height = window.innerHeight;
+    
+    // Настройки игры
+    gameState.defaultSpawnInterval = 1500;
+    gameState.defaultLives = 5;
+    
+    if (isMobileDevice() && window.innerWidth < 500) {
+        gameState.mobileSpawnRange = 11;
+    }
+    
+    // Пытаемся настроить камеру
+    try {
+        await setupHandTracking();
+        console.log('Camera tracking initialized');
+        
+        // Скрываем загрузку и показываем стартовый экран
+        loadingScreen.style.display = 'none';
+        startScreen.style.display = 'flex';
+        
+        // Показываем подсказку для камеры
+        showCameraHint();
+        
+    } catch (error) {
+        console.log('Camera not available, using mouse controls:', error);
+        
+        // Если камера недоступна, настраиваем управление мышью
+        setupMouseControls();
+        
+        // Скрываем загрузку и показываем стартовый экран
+        loadingScreen.style.display = 'none';
+        startScreen.style.display = 'flex';
+        
+        // Показываем подсказку для мыши
+        showMouseHint();
+    }
+}
+
+// Подсказка для камеры
+function showCameraHint() {
+    const hint = document.createElement('div');
+    hint.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(0,255,0,0.8);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 20px;
+        z-index: 9999;
+        font-size: 1em;
+        text-align: center;
+    `;
+    hint.innerHTML = '🎥 Управление: Двигайте рукой перед камерой';
+    document.body.appendChild(hint);
+    
+    setTimeout(() => {
+        hint.style.transition = 'opacity 1s';
+        hint.style.opacity = '0';
+        setTimeout(() => hint.remove(), 1000);
+    }, 5000);
+}
+
+// Подсказка для мыши
+function showMouseHint() {
+    const hint = document.createElement('div');
+    hint.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(255,165,0,0.8);
+        color: white;
+        padding: 10px 20px;
+        border-radius: 20px;
+        z-index: 9999;
+        font-size: 1em;
+        text-align: center;
+    `;
+    hint.innerHTML = '🖱️ Управление: Зажмите ЛКМ и двигайте мышью';
+    document.body.appendChild(hint);
+    
+    setTimeout(() => {
+        hint.style.transition = 'opacity 1s';
+        hint.style.opacity = '0';
+        setTimeout(() => hint.remove(), 1000);
+    }, 5000);
+}
+
+// ОБНОВЛЕННЫЙ игровой цикл
+function gameLoop(timestamp) {
+    if (!gameState.lastFrameTime) {
+        gameState.lastFrameTime = timestamp;
+    }
+    
+    const deltaTime = (timestamp - gameState.lastFrameTime) / 1000;
+    gameState.lastFrameTime = timestamp;
+    
+    if (gameState.isGameActive) {
+        // Спавн объектов
+        if (timestamp - gameState.lastSpawnTime > gameState.spawnInterval) {
+            spawnObject();
+            gameState.lastSpawnTime = timestamp;
+            gameState.spawnInterval = Math.max(200, gameState.spawnInterval - 50);
+        }
+        
+        updateObjects(deltaTime);
+        updateParticles(deltaTime);
+        
+        // Проверяем коллизии (работает для обоих режимов)
+        checkCollisions();
+        
+        updateBladeTrails();
+        renderer.render(scene, camera);
+        gameState.frameCount++;
+        
+        requestAnimationFrame(gameLoop);
+    }
+}
 init();
