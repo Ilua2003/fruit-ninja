@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fruit Ninja - VK Play</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: black;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 24px;
+            z-index: 100;
+            background: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 10px;
+        }
+        
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 1000;
+            text-align: center;
+        }
+        
+        #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            z-index: 1000;
+            text-align: center;
+        }
+        
+        button {
+            background: #ff4444;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 20px;
+        }
+        
+        .blade {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            background: radial-gradient(circle, #00ffff, #0088ff);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 50;
+            box-shadow: 0 0 20px #00ffff;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        
+        <div id="ui">
+            Очки: <span id="score">0</span> | 
+            Жизни: <span id="lives">3</span>
+        </div>
+
+        <div id="start-screen">
+            <h1>🍉 Fruit Ninja 🥷</h1>
+            <p style="margin: 20px; font-size: 18px;">VK Play версия</p>
+            <p style="margin: 10px;">Управление: двигайте мышью и кликайте по фруктам</p>
+            <button id="start-btn">ИГРАТЬ</button>
+        </div>
+        
+        <div id="game-over">
+            <h1>Игра окончена!</h1>
+            <p style="margin: 20px; font-size: 24px;">Счет: <span id="final-score">0</span></p>
+            <button id="restart-btn">Играть снова</button>
+        </div>
+    </div>
+
+    <script>
+        // Простая версия игры для VK Play
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Размеры canvas
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // Игровые переменные
+        let score = 0;
+        let lives = 3;
+        let gameActive = false;
+        let fruits = [];
+        let particles = [];
+        let lastSpawn = 0;
+        
+        // Элементы UI
+        const scoreElement = document.getElementById('score');
+        const livesElement = document.getElementById('lives');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over');
+        const finalScoreElement = document.getElementById('final-score');
+        
+        // Фрукты
+        const fruitTypes = [
+            { color: '#ff4444', radius: 25 }, // Красный
+            { color: '#ffaa00', radius: 22 }, // Оранжевый  
+            { color: '#44ff44', radius: 28 }, // Зеленый
+            { color: '#8844ff', radius: 20 }  // Фиолетовый
+        ];
+        
+        // Мышь
+        let mouse = { x: 0, y: 0, down: false };
+        
+        // Обработчики мыши
+        canvas.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+            
+            // Создаем эффект следа при движении
+            if (mouse.down && gameActive) {
+                createParticle(mouse.x, mouse.y, '#00ffff');
+            }
+        });
+        
+        canvas.addEventListener('mousedown', (e) => {
+            mouse.down = true;
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+            
+            // Сразу проверяем клик по фрукту
+            if (gameActive) {
+                checkFruitClick(mouse.x, mouse.y);
+                createParticle(mouse.x, mouse.y, '#ffff00');
+            }
+        });
+        
+        canvas.addEventListener('mouseup', () => {
+            mouse.down = false;
+        });
+        
+        canvas.addEventListener('click', (e) => {
+            if (gameActive) {
+                checkFruitClick(e.clientX, e.clientY);
+            }
+        });
+        
+        // Создание частиц для эффектов
+        function createParticle(x, y, color) {
+            particles.push({
+                x: x,
+                y: y,
+                color: color,
+                radius: 8,
+                life: 1.0
+            });
+        }
+        
+        // Создание фрукта
+        function createFruit() {
+            const type = fruitTypes[Math.floor(Math.random() * fruitTypes.length)];
+            
+            fruits.push({
+                x: Math.random() * (canvas.width - 100) + 50,
+                y: canvas.height + 50,
+                vx: (Math.random() - 0.5) * 4,
+                vy: - (12 + Math.random() * 8),
+                radius: type.radius,
+                color: type.color,
+                sliced: false
+            });
+        }
+        
+        // Проверка клика по фрукту
+        function checkFruitClick(x, y) {
+            for (let i = fruits.length - 1; i >= 0; i--) {
+                const fruit = fruits[i];
+                const dx = fruit.x - x;
+                const dy = fruit.y - y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < fruit.radius && !fruit.sliced) {
+                    // Фрукт разрезан!
+                    fruit.sliced = true;
+                    score += 10;
+                    scoreElement.textContent = score;
+                    
+                    // Эффект взрыва
+                    for (let j = 0; j < 8; j++) {
+                        createParticle(fruit.x, fruit.y, fruit.color);
+                    }
+                    
+                    // Удаляем фрукт
+                    fruits.splice(i, 1);
+                    break;
+                }
+            }
+        }
+        
+        // Обновление игры
+        function update() {
+            const now = Date.now();
+            
+            if (gameActive) {
+                // Спавн новых фруктов
+                if (now - lastSpawn > 1500) {
+                    createFruit();
+                    lastSpawn = now;
+                }
+                
+                // Обновление фруктов
+                for (let i = fruits.length - 1; i >= 0; i--) {
+                    const fruit = fruits[i];
+                    
+                    // Гравитация
+                    fruit.vy += 0.5;
+                    
+                    // Движение
+                    fruit.x += fruit.vx;
+                    fruit.y += fruit.vy;
+                    
+                    // Отскок от стен
+                    if (fruit.x < fruit.radius || fruit.x > canvas.width - fruit.radius) {
+                        fruit.vx *= -0.8;
+                    }
+                    
+                    // Проверка выхода за экран
+                    if (fruit.y > canvas.height + 100 && !fruit.sliced) {
+                        // Пропущен фрукт
+                        lives--;
+                        livesElement.textContent = lives;
+                        
+                        if (lives <= 0) {
+                            endGame();
+                        }
+                        
+                        fruits.splice(i, 1);
+                    }
+                }
+                
+                // Обновление частиц
+                for (let i = particles.length - 1; i >= 0; i--) {
+                    const particle = particles[i];
+                    particle.life -= 0.02;
+                    
+                    if (particle.life <= 0) {
+                        particles.splice(i, 1);
+                    }
+                }
+            }
+        }
+        
+        // Отрисовка
+        function draw() {
+            // Очистка canvas
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Рисуем фон
+            ctx.fillStyle = '#001122';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Рисуем фрукты
+            fruits.forEach(fruit => {
+                ctx.fillStyle = fruit.color;
+                ctx.beginPath();
+                ctx.arc(fruit.x, fruit.y, fruit.radius, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Эффект свечения
+                ctx.shadowColor = fruit.color;
+                ctx.shadowBlur = 15;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            });
+            
+            // Рисуем частицы
+            particles.forEach(particle => {
+                ctx.globalAlpha = particle.life;
+                ctx.fillStyle = particle.color;
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.radius * particle.life, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+            
+            // Эффект лезвия при зажатой кнопке
+            if (mouse.down && gameActive) {
+                ctx.fillStyle = '#00ffff';
+                ctx.beginPath();
+                ctx.arc(mouse.x, mouse.y, 15, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.shadowColor = '#00ffff';
+                ctx.shadowBlur = 20;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+        }
+        
+        // Игровой цикл
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Начало игры
+        function startGame() {
+            score = 0;
+            lives = 3;
+            fruits = [];
+            particles = [];
+            gameActive = true;
+            
+            scoreElement.textContent = score;
+            livesElement.textContent = lives;
+            
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+        }
+        
+        // Конец игры
+        function endGame() {
+            gameActive = false;
+            finalScoreElement.textContent = score;
+            gameOverScreen.style.display = 'flex';
+        }
+        
+        // Обработчики кнопок
+        document.getElementById('start-btn').addEventListener('click', startGame);
+        document.getElementById('restart-btn').addEventListener('click', startGame);
+        
+        // Запуск игрового цикла
+        gameLoop();
+        
+        // Обработка изменения размера окна
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
+    </script>
+</body>
+</html>
