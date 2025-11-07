@@ -1,44 +1,10 @@
-// VK PLAY CAMERA FIX - УЛУЧШЕННАЯ ВЕРСИЯ
-function setupVKPlayCamera() {
-    return new Promise((resolve, reject) => {
-        // Сначала проверяем, возможно ли вообще получить камеру
-        checkCameraPermissions().then(hasPermission => {
-            if (hasPermission) {
-                // Если есть разрешение, пробуем использовать камеру
-                setupCameraWithFallback().then(resolve).catch(reject);
-            } else {
-                // Если нет разрешения, сразу показываем альтернативу
-                showCameraInstructions();
-                reject(new Error('Camera permission denied'));
-            }
-        });
-    });
-}
-
-// Проверка разрешений камеры
-async function checkCameraPermissions() {
-    try {
-        // Проверяем текущие разрешения
-        const permissions = await navigator.permissions.query({ name: 'camera' });
-        return permissions.state === 'granted';
-    } catch (error) {
-        // Если API permissions не поддерживается, пробуем получить камеру
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            stream.getTracks().forEach(track => track.stop());
-            return true;
-        } catch (e) {
-            return false;
-        }
-    }
-}
-
-// Показываем инструкцию по камере
-function showCameraInstructions() {
-    // Скрываем стандартный экран загрузки
+// VK PLAY CAMERA FIX - ПРОСТАЯ ВЕРСИЯ
+function showVKPlayInstructions() {
+    // Сразу скрываем загрузку и показываем инструкции
     loadingScreen.style.display = 'none';
-    
-    // Создаем красивый экран инструкций
+    startScreen.style.display = 'none';
+    gameOverScreen.style.display = 'none';
+
     const instructionScreen = document.createElement('div');
     instructionScreen.id = 'instruction-screen';
     instructionScreen.style.cssText = `
@@ -64,48 +30,41 @@ function showCameraInstructions() {
             <h1 style="font-size: 2.5em; margin-bottom: 10px;">🎮 Fruit Ninja</h1>
             <h2 style="font-size: 1.5em; margin-bottom: 20px;">Управление жестами</h2>
             
-            <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 10px; margin: 15px 0;">
+            <div style="background: rgba(255,0,0,0.3); padding: 15px; border-radius: 10px; margin: 15px 0;">
                 <p style="font-size: 1.1em; margin-bottom: 15px;">
                     <strong>⚠️ Внимание!</strong><br>
-                    VK Play блокирует доступ к камере для игр
+                    VK Play блокирует доступ к камере
                 </p>
             </div>
             
             <div style="margin: 20px 0;">
-                <h3 style="margin-bottom: 15px;">🎯 Как играть:</h3>
-                <p><strong>Вариант 1 (рекомендуется):</strong></p>
                 <button id="open-browser" style="
                     background: #4CAF50;
                     color: white;
                     border: none;
-                    padding: 12px 24px;
+                    padding: 15px 30px;
                     border-radius: 25px;
                     margin: 10px;
                     cursor: pointer;
-                    font-size: 1.1em;
+                    font-size: 1.2em;
                     width: 100%;
                 ">
                     🚀 Открыть в браузере (работает камера)
                 </button>
                 
-                <p style="margin-top: 20px;"><strong>Вариант 2 (в VK Play):</strong></p>
                 <button id="play-mouse" style="
                     background: #2196F3;
                     color: white;
                     border: none;
-                    padding: 12px 24px;
+                    padding: 15px 30px;
                     border-radius: 25px;
                     margin: 10px;
                     cursor: pointer;
-                    font-size: 1.1em;
+                    font-size: 1.2em;
                     width: 100%;
                 ">
                     🖱️ Играть с управлением мышью
                 </button>
-            </div>
-            
-            <div style="margin-top: 20px; font-size: 0.9em; opacity: 0.8;">
-                <p>Для полного опыта с отслеживанием рук используйте браузерную версию</p>
             </div>
         </div>
     `;
@@ -119,14 +78,14 @@ function showCameraInstructions() {
     
     document.getElementById('play-mouse').addEventListener('click', function() {
         instructionScreen.remove();
+        setupMouseControls();
         startScreen.style.display = 'flex'; // Показываем стандартный экран старта
-        setupMouseControls(); // Включаем управление мышью
     });
 }
 
 // Настройка управления мышью
 function setupMouseControls() {
-    console.log('Mouse controls activated for VK Play');
+    console.log('Mouse controls activated');
     
     // Добавляем обработчики мыши
     gameCanvas.addEventListener('mousemove', handleMouseMove);
@@ -137,30 +96,7 @@ function setupMouseControls() {
     // Имитируем данные руки для игры
     gameState.fingerTip = { x: 0.5, y: 0.5, z: 0 };
     gameState.prevFingerTip = { x: 0.5, y: 0.5, z: 0 };
-    gameState.handLandmarks = [{x: 0.5, y: 0.5, z: 0}]; // Фиктивные данные
-    
-    // Показываем подсказку об управлении
-    showMouseHint();
-}
-
-function showMouseHint() {
-    const hint = document.createElement('div');
-    hint.style.cssText = `
-        position: fixed;
-        bottom: 10px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(0,0,0,0.8);
-        color: white;
-        padding: 8px 16px;
-        border-radius: 20px;
-        z-index: 9999;
-        font-size: 0.9em;
-    `;
-    hint.textContent = 'Управление: двигайте мышью для разрезания фруктов';
-    document.body.appendChild(hint);
-    
-    setTimeout(() => hint.remove(), 5000);
+    gameState.handLandmarks = [{x: 0.5, y: 0.5, z: 0}];
 }
 
 // Обработчики мыши
@@ -187,8 +123,6 @@ function handleMouseMove(event) {
 
 function handleMouseDown(event) {
     isMouseDown = true;
-    
-    // Создаем начальный след
     const rect = gameCanvas.getBoundingClientRect();
     const x = (event.clientX - rect.left) / rect.width;
     const y = (event.clientY - rect.top) / rect.height;
@@ -206,9 +140,12 @@ function handleMouseUp() {
     isMouseDown = false;
 }
 
-// ОБНОВЛЕННАЯ ФУНКЦИЯ INIT
+// ОБНОВЛЕННАЯ ФУНКЦИЯ INIT - ПРОСТАЯ
 async function init() {
-    // Сначала настраиваем базовые элементы
+    // Сразу показываем инструкции для VK Play
+    showVKPlayInstructions();
+    
+    // Настраиваем базовые обработчики
     startButton.addEventListener('click', startGame);
     restartButton.addEventListener('click', startGame);
     window.addEventListener('resize', onWindowResize);
@@ -223,18 +160,8 @@ async function init() {
         gameState.mobileSpawnRange = 11;
     }
     
-    // Пытаемся настроить камеру
-    try {
-        await setupVKPlayCamera();
-        // Если камера доступна, настраиваем отслеживание рук
-        await setupHandTracking();
-        loadingScreen.style.display = 'none';
-        startScreen.style.display = 'flex';
-    } catch (error) {
-        // Если камера недоступна, показываем инструкции
-        console.log('Camera not available, showing instructions');
-        // Функция showCameraInstructions уже покажет альтернативы
-    }
+    // НЕ пытаемся настроить камеру в VK Play - сразу управление мышью
+    console.log('VK Play detected - using mouse controls');
 }
 
 
