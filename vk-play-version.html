@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fruit Ninja - VK Play Версия</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            color: white;
+        }
+        
+        #game-container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #game-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+        
+        #info-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 1.2em;
+        }
+        
+        #start-screen, #game-over {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            text-align: center;
+        }
+        
+        #game-over {
+            display: none;
+        }
+        
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2em;
+            border-radius: 25px;
+            cursor: pointer;
+            margin: 20px;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        .blade-trail {
+            position: absolute;
+            height: 6px;
+            background: rgba(0, 195, 255, 0.8);
+            box-shadow: 0 0 15px 3px rgba(0, 195, 255, 0.8);
+            pointer-events: none;
+            z-index: 50;
+            transform-origin: 0 0;
+        }
+        
+        #mouse-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 165, 0, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 100;
+            font-size: 1em;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        
+        <div id="info-container">
+            <div>Очки: <span id="score">0</span></div>
+            <div>Жизни: <span id="lives">3</span></div>
+        </div>
+
+        <div id="start-screen">
+            <h1 style="font-size: 3em; margin-bottom: 20px;">✋ Fruit Ninja 🥷</h1>
+            <p style="font-size: 1.5em; margin-bottom: 10px;">VK Play Версия</p>
+            <p style="font-size: 1.2em; margin-bottom: 20px;">Управление мышью</p>
+            <p style="margin-bottom: 30px;">Зажмите ЛКМ и двигайте мышью чтобы резать фрукты</p>
+            <button id="start-button">Начать игру</button>
+        </div>
+        
+        <div id="game-over">
+            <h1 style="font-size: 3em; margin-bottom: 20px;">Игра окончена</h1>
+            <p style="font-size: 1.5em; margin-bottom: 20px;">Ваш счет: <span id="final-score">0</span></p>
+            <button id="restart-button">Играть снова</button>
+        </div>
+        
+        <div id="mouse-hint">
+            🖱️ Зажмите ЛКМ и двигайте мышью для разрезания фруктов
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <script>
+        // Game state
+        const gameState = {
+            score: 0,
+            lives: 3,
+            isGameActive: false,
+            fruits: [],
+            particles: [],
+            bladeTrails: [],
+            lastFrameTime: 0,
+            spawnInterval: 2000,
+            lastSpawnTime: 0,
+            mousePosition: { x: 0, y: 0 },
+            isMouseDown: false,
+            mouseSpeed: 0,
+            lastMouseTime: 0
+        };
+
+        // DOM elements
+        const gameCanvas = document.getElementById('game-canvas');
+        const scoreElement = document.getElementById('score');
+        const livesElement = document.getElementById('lives');
+        const startScreen = document.getElementById('start-screen');
+        const startButton = document.getElementById('start-button');
+        const gameOverScreen = document.getElementById('game-over');
+        const restartButton = document.getElementById('restart-button');
+        const finalScoreElement = document.getElementById('final-score');
+        const mouseHint = document.getElementById('mouse-hint');
+
+        // Three.js setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ 
+            canvas: gameCanvas, 
+            alpha: true, 
+            antialias: true 
+        });
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000, 0);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        directionalLight.position.set(10, 10, 10);
+        scene.add(directionalLight);
+
+        // Camera position
+        camera.position.z = 25;
+
+        // Fruit geometries and materials
+        const fruitGeometries = [
+            new THREE.SphereGeometry(2, 16, 16),
+            new THREE.SphereGeometry(1.8, 16, 16),
+            new THREE.SphereGeometry(2.2, 16, 16),
+            new THREE.ConeGeometry(1.5, 3, 16)
+        ];
+
+        const fruitMaterials = [
+            new THREE.MeshLambertMaterial({ color: 0xff4444 }), // Red
+            new THREE.MeshLambertMaterial({ color: 0xffaa00 }), // Orange
+            new THREE.MeshLambertMaterial({ color: 0x44ff44 }), // Green
+            new THREE.MeshLambertMaterial({ color: 0xff44ff })  // Pink
+        ];
+
+        // MOUSE CONTROLS
+        function setupMouseControls() {
+            gameCanvas.addEventListener('mousemove', handleMouseMove);
+            gameCanvas.addEventListener('mousedown', handleMouseDown);
+            gameCanvas.addEventListener('mouseup', handleMouseUp);
+            gameCanvas.style.cursor = 'crosshair';
+        }
+
+        function handleMouseMove(event) {
+            const rect = gameCanvas.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / rect.width;
+            const y = (event.clientY - rect.top) / rect.height;
+            
+            const now = Date.now();
+            const deltaTime = (now - gameState.lastMouseTime) / 1000;
+            gameState.lastMouseTime = now;
+            
+            // Calculate mouse speed
+            const deltaX = x - gameState.mousePosition.x;
+            const deltaY = y - gameState.mousePosition.y;
+            gameState.mouseSpeed = Math.sqrt(deltaX * deltaX + deltaY * deltaY) / (deltaTime || 0.016);
+            
+            // Update positions
+            gameState.mousePosition = { x, y };
+            
+            // Create blade trail when mouse is down and moving fast enough
+            if (gameState.isMouseDown && gameState.isGameActive && gameState.mouseSpeed > 20) {
+                createBladeTrail(event.clientX, event.clientY);
+                checkMouseCollisions(event.clientX, event.clientY);
+            }
+        }
+
+        function handleMouseDown(event) {
+            gameState.isMouseDown = true;
+            gameState.mouseSpeed = 100;
+            
+            // Create initial blade effect
+            createBladeTrail(event.clientX, event.clientY);
+            
+            // Check for immediate collision
+            checkMouseCollisions(event.clientX, event.clientY);
+        }
+
+        function handleMouseUp() {
+            gameState.isMouseDown = false;
+        }
+
+        function createBladeTrail(x, y) {
+            const trail = document.createElement('div');
+            trail.className = 'blade-trail';
+            trail.style.cssText = `
+                width: 30px;
+                height: 6px;
+                left: ${x - 15}px;
+                top: ${y - 3}px;
+                border-radius: 3px;
+            `;
+            
+            document.getElementById('game-container').appendChild(trail);
+            gameState.bladeTrails.push({
+                element: trail,
+                timestamp: Date.now()
+            });
+        }
+
+        function updateBladeTrails() {
+            const now = Date.now();
+            gameState.bladeTrails = gameState.bladeTrails.filter(trail => {
+                const age = now - trail.timestamp;
+                if (age > 300) {
+                    trail.element.remove();
+                    return false;
+                } else {
+                    trail.element.style.opacity = 1 - (age / 300);
+                    return true;
+                }
+            });
+        }
+
+        function checkMouseCollisions(mouseX, mouseY) {
+            if (!gameState.isMouseDown || !gameState.isGameActive) return;
+            
+            const rect = gameCanvas.getBoundingClientRect();
+            const normalizedX = ((mouseX - rect.left) / rect.width) * 40 - 20;
+            const normalizedY = (1 - (mouseY - rect.top) / rect.height) * 30 - 15;
+            
+            gameState.fruits.forEach(fruit => {
+                if (!fruit.sliced) {
+                    const dx = fruit.mesh.position.x - normalizedX;
+                    const dy = fruit.mesh.position.y - normalizedY;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance < 4 && gameState.mouseSpeed > 20) {
+                        sliceFruit(fruit);
+                    }
+                }
+            });
+        }
+
+        // FRUIT FUNCTIONS
+        function spawnFruit() {
+            const fruitIndex = Math.floor(Math.random() * fruitGeometries.length);
+            const fruit = new THREE.Mesh(fruitGeometries[fruitIndex], fruitMaterials[fruitIndex]);
+            
+            fruit.position.x = (Math.random() * 30) - 15;
+            fruit.position.y = -15;
+            fruit.position.z = 0;
+            
+            const velocity = {
+                x: (Math.random() - 0.5) * 2,
+                y: 8 + Math.random() * 6,
+                z: 0,
+                rotationX: Math.random() * 0.1,
+                rotationY: Math.random() * 0.1,
+                rotationZ: Math.random() * 0.1
+            };
+            
+            const fruitObject = {
+                mesh: fruit,
+                velocity: velocity,
+                sliced: false
+            };
+            
+            gameState.fruits.push(fruitObject);
+            scene.add(fruit);
+        }
+
+        function updateFruits(deltaTime) {
+            gameState.fruits = gameState.fruits.filter(fruit => {
+                // Apply gravity
+                fruit.velocity.y -= 12.0 * deltaTime;
+                
+                // Update position
+                fruit.mesh.position.x += fruit.velocity.x * deltaTime;
+                fruit.mesh.position.y += fruit.velocity.y * deltaTime;
+                
+                // Update rotation
+                fruit.mesh.rotation.x += fruit.velocity.rotationX;
+                fruit.mesh.rotation.y += fruit.velocity.rotationY;
+                fruit.mesh.rotation.z += fruit.velocity.rotationZ;
+                
+                // Check if fruit is out of screen
+                if (fruit.mesh.position.y < -20) {
+                    if (!fruit.sliced) {
+                        gameState.lives--;
+                        livesElement.textContent = gameState.lives;
+                        
+                        if (gameState.lives <= 0) {
+                            endGame();
+                        }
+                    }
+                    
+                    scene.remove(fruit.mesh);
+                    return false;
+                }
+                
+                return true;
+            });
+        }
+
+        function sliceFruit(fruit) {
+            fruit.sliced = true;
+            gameState.score += 10;
+            scoreElement.textContent = gameState.score;
+            
+            // Create explosion particles
+            createExplosion(fruit.mesh.position, fruit.mesh.material.color);
+            
+            // Remove the fruit
+            scene.remove(fruit.mesh);
+        }
+
+        function createExplosion(position, color) {
+            const particleCount = 8;
+            
+            for (let i = 0; i < particleCount; i++) {
+                const geometry = new THREE.SphereGeometry(0.5, 8, 8);
+                const material = new THREE.MeshLambertMaterial({ color: color.getHex() });
+                const particle = new THREE.Mesh(geometry, material);
+                
+                particle.position.copy(position);
+                
+                const velocity = {
+                    x: (Math.random() - 0.5) * 10,
+                    y: (Math.random() - 0.5) * 10,
+                    z: 0
+                };
+                
+                const particleObj = {
+                    mesh: particle,
+                    velocity: velocity,
+                    lifetime: 1.0,
+                    age: 0
+                };
+                
+                scene.add(particle);
+                gameState.particles.push(particleObj);
+            }
+        }
+
+        function updateParticles(deltaTime) {
+            gameState.particles = gameState.particles.filter(particle => {
+                particle.age += deltaTime;
+                
+                if (particle.age >= particle.lifetime) {
+                    scene.remove(particle.mesh);
+                    return false;
+                }
+                
+                // Update position
+                particle.mesh.position.x += particle.velocity.x * deltaTime;
+                particle.mesh.position.y += particle.velocity.y * deltaTime;
+                
+                // Fade out
+                const progress = particle.age / particle.lifetime;
+                particle.mesh.material.opacity = 1 - progress;
+                particle.mesh.material.transparent = true;
+                
+                return true;
+            });
+        }
+
+        // GAME LOOP
+        function gameLoop(timestamp) {
+            if (!gameState.lastFrameTime) {
+                gameState.lastFrameTime = timestamp;
+            }
+            
+            const deltaTime = (timestamp - gameState.lastFrameTime) / 1000;
+            gameState.lastFrameTime = timestamp;
+            
+            if (gameState.isGameActive) {
+                // Spawn new fruits
+                if (timestamp - gameState.lastSpawnTime > gameState.spawnInterval) {
+                    spawnFruit();
+                    gameState.lastSpawnTime = timestamp;
+                    
+                    // Increase difficulty
+                    gameState.spawnInterval = Math.max(800, gameState.spawnInterval - 20);
+                }
+                
+                updateFruits(deltaTime);
+                updateParticles(deltaTime);
+                updateBladeTrails();
+                
+                renderer.render(scene, camera);
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function startGame() {
+            // Reset game state
+            gameState.score = 0;
+            gameState.lives = 3;
+            gameState.isGameActive = true;
+            gameState.lastSpawnTime = 0;
+            gameState.spawnInterval = 2000;
+            
+            // Clear existing objects
+            gameState.fruits.forEach(fruit => scene.remove(fruit.mesh));
+            gameState.particles.forEach(particle => scene.remove(particle.mesh));
+            gameState.bladeTrails.forEach(trail => trail.element.remove());
+            
+            gameState.fruits = [];
+            gameState.particles = [];
+            gameState.bladeTrails = [];
+            
+            // Update UI
+            scoreElement.textContent = gameState.score;
+            livesElement.textContent = gameState.lives;
+            
+            // Hide screens
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            
+            // Hide mouse hint after game starts
+            setTimeout(() => {
+                mouseHint.style.display = 'none';
+            }, 3000);
+            
+            // Start game loop
+            requestAnimationFrame(gameLoop);
+        }
+
+        function endGame() {
+            gameState.isGameActive = false;
+            finalScoreElement.textContent = gameState.score;
+            gameOverScreen.style.display = 'flex';
+            mouseHint.style.display = 'block';
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // INITIALIZATION
+        function init() {
+            // Setup controls
+            setupMouseControls();
+            
+            // Event listeners
+            startButton.addEventListener('click', startGame);
+            restartButton.addEventListener('click', startGame);
+            window.addEventListener('resize', onWindowResize);
+            
+            // Set initial UI
+            scoreElement.textContent = gameState.score;
+            livesElement.textContent = gameState.lives;
+        }
+
+        // Start the game
+        init();
+    </script>
+</body>
+</html>
