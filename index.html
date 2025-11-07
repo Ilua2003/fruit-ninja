@@ -1,70 +1,147 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hand Tracking Fruit Ninja</title>
+    <title>Fruit Ninja - Управление мышью</title>
     <link rel="stylesheet" href="styles.css">
 
-        <!-- Primary Meta Tags -->
-        <meta name="title" content="Fruit Ninja: slice fruits with your hands!">
-        <meta name="description" content="Free web game; no sign-up or downloads">
+    <!-- Primary Meta Tags -->
+    <meta name="title" content="Fruit Ninja: режь фрукты мышью!">
+    <meta name="description" content="Бесплатная браузерная игра - режь фрукты с помощью мыши">
     
-        <!-- Open Graph / Facebook -->
-        <meta property="og:type" content="website">
-        <meta property="og:url" content="https://collidingscopes.github.io/fruit-ninja/">
-        <meta property="og:title" content="Fruit Ninja: slice fruits with your hands!">
-        <meta property="og:description" content="Free web game; no sign-up or downloads">
-        <meta property="og:image" content="https://raw.githubusercontent.com/collidingScopes/siteOG/main/fruitNinja.png">
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://ilua2003.github.io/fruit-ninja/">
+    <meta property="og:title" content="Fruit Ninja: режь фрукты мышью!">
+    <meta property="og:description" content="Бесплатная браузерная игра - режь фрукты с помощью мыши">
+    <meta property="og:image" content="https://raw.githubusercontent.com/collidingScopes/siteOG/main/fruitNinja.png">
     
-        <!-- Twitter -->
-        <meta property="twitter:card" content="summary_large_image">
-        <meta property="twitter:url" content="https://collidingscopes.github.io/fruit-ninja/">
-        <meta property="twitter:title" content="Fruit Ninja: slice fruits with your hands!">
-        <meta property="twitter:description" content="Free web game; no sign-up or downloads">
-        <meta property="twitter:image" content="https://raw.githubusercontent.com/collidingScopes/siteOG/main/fruitNinja.png">
-    
-        <!-- <link rel="icon" href="assets/favicon.png">
-        <link rel="apple-touch-icon" href="assets/apple-touch-icon.png"> -->
-        <script defer src="https://cloud.umami.is/script.js" data-website-id="eb59c81c-27cb-4e1d-9e8c-bfbe70c48cd9"></script>
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://ilua2003.github.io/fruit-ninja/">
+    <meta property="twitter:title" content="Fruit Ninja: режь фрукты мышью!">
+    <meta property="twitter:description" content="Бесплатная браузерная игра - режь фрукты с помощью мыши">
+    <meta property="twitter:image" content="https://raw.githubusercontent.com/collidingScopes/siteOG/main/fruitNinja.png">
+
+    <style>
+        /* Дополнительные стили для VK Play */
+        #mouse-controls-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 165, 0, 0.9);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 9999;
+            font-size: 1em;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+        
+        #vk-play-warning {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 0, 0, 0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 10px;
+            z-index: 9999;
+            font-size: 0.9em;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
     <div id="game-container">
-        <p id="feedback-para">Feedback: <a href="https://vk.com/ha1rex" target="_blank">VK</a> / <a href="http://t.me/crashbush" target="_blank">Telegram</a></p>
+        <p id="feedback-para">Обратная связь: <a href="https://vk.com/ha1rex" target="_blank">VK</a> / <a href="http://t.me/crashbush" target="_blank">Telegram</a></p>
         <div id="background"></div>
         <canvas id="game-canvas"></canvas>
-        <video id="video" playsinline></video>
-        <canvas id="hand-canvas"></canvas>
+        
+        <!-- Убираем камеру для VK Play -->
+        <!-- <video id="video" playsinline></video> -->
+        <!-- <canvas id="hand-canvas"></canvas> -->
+        
         <div id="info-container">
-            <div id="score-container">Score: <span id="score">0</span></div>
-            <div id="lives-container">Lives: <span id="lives">3</span></div>    
+            <div id="score-container">Очки: <span id="score">0</span></div>
+            <div id="lives-container">Жизни: <span id="lives">3</span></div>    
         </div>
 
         <div id="start-screen">
-            <h1>✋Fruit Ninja🥷</h1>
-            <p>Slice fruits with your hands!</p>
-            <p>Enable webcam and move your hand in front of the camera</p>
-            <p>Miss a fruit; lose a life</p>
-            <button id="start-button">Start</button>
+            <h1>✋ Fruit Ninja 🥷</h1>
+            <p><strong>Управление мышью</strong></p>
+            <p>Зажмите ЛКМ и двигайте мышью чтобы резать фрукты</p>
+            <p>Пропустите фрукт - потеряйте жизнь</p>
+            <button id="start-button">Начать игру</button>
         </div>
         
         <div id="game-over">
-            <h1>Game Over</h1>
-            <p>Your final score: <span id="final-score">0</span></p>
-            <button id="restart-button">Play Again</button>
-            <p>To say hi or send feedback to me: <a href="https://vk.com/ha1rex" target="_blank">VK</a> / <a href="http://t.me/crashbush" target="_blank">Telegram</a></p>
+            <h1>Игра окончена</h1>
+            <p>Ваш счет: <span id="final-score">0</span></p>
+            <button id="restart-button">Играть снова</button>
+            <p>Обратная связь: <a href="https://vk.com/ha1rex" target="_blank">VK</a> / <a href="http://t.me/crashbush" target="_blank">Telegram</a></p>
         </div>
         
         <div id="loading">
-            <h2>Loading...</h2>
-            <p>Initializing hand tracking and game assets</p>
+            <h2>Загрузка...</h2>
+            <p>Инициализация игры</p>
         </div>
+    </div>
+
+    <!-- Предупреждение для VK Play -->
+    <div id="vk-play-warning" style="display: none;">
+        ⚠️ VK Play: Используйте управление мышью
+    </div>
+
+    <div id="mouse-controls-hint" style="display: none;">
+        🖱️ Управление: Зажмите ЛКМ и двигайте мышью для разрезания
     </div>
 </body>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<!-- Убираем MediaPipe для VK Play -->
+<!-- <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script> -->
+<!-- <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script> -->
 
 <script src="game.js"></script>
+
+<script>
+    // Специальная инициализация для VK Play
+    document.addEventListener('DOMContentLoaded', function() {
+        // Показываем предупреждение для VK Play
+        const warning = document.getElementById('vk-play-warning');
+        const hint = document.getElementById('mouse-controls-hint');
+        
+        if (warning) warning.style.display = 'block';
+        if (hint) hint.style.display = 'block';
+        
+        // Убираем предупреждение через 5 секунд
+        setTimeout(() => {
+            if (warning) {
+                warning.style.transition = 'opacity 1s';
+                warning.style.opacity = '0';
+                setTimeout(() => warning.style.display = 'none', 1000);
+            }
+        }, 5000);
+        
+        // Убираем подсказку через 8 секунд
+        setTimeout(() => {
+            if (hint) {
+                hint.style.transition = 'opacity 1s';
+                hint.style.opacity = '0';
+                setTimeout(() => hint.style.display = 'none', 1000);
+            }
+        }, 8000);
+        
+        // Обновляем текст загрузки
+        const loadingText = document.querySelector('#loading p');
+        if (loadingText) {
+            loadingText.textContent = 'Загрузка игры с управлением мышью...';
+        }
+    });
+</script>
 </html>
